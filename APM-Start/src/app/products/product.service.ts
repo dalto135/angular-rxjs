@@ -1,11 +1,12 @@
 import { Injectable } from '@angular/core';
 import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 
-import { BehaviorSubject, catchError, combineLatest, map, merge, Observable, scan, shareReplay, Subject, tap, throwError } from 'rxjs';
+import { BehaviorSubject, catchError, combineLatest, filter, forkJoin, map, merge, Observable, of, scan, shareReplay, Subject, switchMap, tap, throwError } from 'rxjs';
 
 import { Product } from './product';
 import { ProductCategoryService } from '../product-categories/product-category.service';
 import { SupplierService } from '../suppliers/supplier.service';
+import { Supplier } from '../suppliers/supplier';
 
 @Injectable({
   providedIn: 'root'
@@ -47,7 +48,32 @@ export class ProductService {
     ),
     tap(product => console.log('selectedProduct', product)),
     shareReplay(1)
-  )
+  );
+
+  // selectedProductSuppliers$ = combineLatest([
+  //   this.selectedProduct$,
+  //   this.supplierService.suppliers$
+  // ]).pipe(
+  //   map(([selectedProduct, suppliers]) =>
+  //     suppliers.filter(supplier => selectedProduct?.supplierIds?.includes(supplier.id))
+  //   )
+  // );
+
+  selectedProductSuppliers$ = this.selectedProduct$
+    .pipe(
+      filter(product => Boolean(product)),
+      switchMap(selectedProduct => {
+        if(selectedProduct?.supplierIds) {
+          return forkJoin(selectedProduct.supplierIds.map(supplierId =>
+            this.http.get<Supplier>(`${this.suppliersUrl}/${supplierId}`)
+          ))
+        }
+        else {
+          return of([]);
+        }
+      }),
+      tap(suppliers => console.log('product suppliers', JSON.stringify(suppliers)))
+    );
 
   private productInsertedSubject = new Subject<Product>();
   productInsertedAction$ = this.productInsertedSubject.asObservable();
@@ -61,7 +87,7 @@ export class ProductService {
     )
   )
   
-  constructor (
+  constructor(
     private http: HttpClient,
     private productCategoryService: ProductCategoryService,
     private supplierService: SupplierService
@@ -106,7 +132,8 @@ export class ProductService {
   }
 
 }
-function combinedLatest(arg0: (Observable<Product[]> | Observable<import("../product-categories/product-category").ProductCategory[]>)[]) {
-  throw new Error('Function not implemented.');
-}
+
+// function combinedLatest(arg0: (Observable<Product[]> | Observable<import("../product-categories/product-category").ProductCategory[]>)[]) {
+//   throw new Error('Function not implemented.');
+// }
 
